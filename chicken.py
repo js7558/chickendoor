@@ -155,7 +155,7 @@ def setPins(operation,runtime):
 parser = argparse.ArgumentParser(description='Automated chicken door controller')
 parser.add_argument('-l','--latitude', help='latitude of your coop')
 parser.add_argument('-g','--longitude', help='longitude of your coop')
-parser.add_argument('-e','--elevation', type=float, help='elevation of your coop')
+parser.add_argument('-e','--elevation', type=float, help='elevation in meters of your coop')
 parser.add_argument('-o','--openpin', type=int, help='gpio pin for open')
 parser.add_argument('-c','--closepin', type=int, help='gpio pin for close')
 parser.add_argument('-t','--runtime', type=int, help='runtime for actuator')
