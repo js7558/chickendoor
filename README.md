@@ -19,6 +19,7 @@ I have a 12" linear actuator controlling a small swinging door on my chicken coo
 
 # Help:
 root@lizard:/home/pi/chicken# ./chicken.py --help
+
 usage: chicken.py [-h] [-l LATITUDE] [-g LONGITUDE] [-e ELEVATION]
                   [-o OPENPIN] [-c CLOSEPIN] [-t RUNTIME] [-d]
 
@@ -29,24 +30,31 @@ optional arguments:
   -h, --help            show this help message and exit
   
   -l LATITUDE, --latitude LATITUDE
+                        
                         latitude of your coop
                         
   -g LONGITUDE, --longitude LONGITUDE
+                        
                         longitude of your coop
                         
   -e ELEVATION, --elevation ELEVATION
+                        
                         elevation of your coop
                         
   -o OPENPIN, --openpin OPENPIN
+                        
                         gpio pin for open
                         
   -c CLOSEPIN, --closepin CLOSEPIN
+                        
                         gpio pin for close
                         
   -t RUNTIME, --runtime RUNTIME
+                        
                         runtime for actuator
                         
   -d, --debug           enable debugging logging
+
 
 # Caveats/Considerations:
 - I use mine on a door that swings on normal hinges, but there isn't any reason you couldn't use this for a door that moves in a single plane.  There are a lot of door designs online like this where it goes up/down vs. swinging on hinges.
