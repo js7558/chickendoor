@@ -28,36 +28,40 @@ Automated chicken door controller
 
 optional arguments:
 
-  -h, --help            show this help message and exit
+  -h, --help            
+      
+   show this help message and exit
   
   -l LATITUDE, --latitude LATITUDE
                         
-                        latitude of your coop
+   latitude of your coop
                         
   -g LONGITUDE, --longitude LONGITUDE
                         
-                        longitude of your coop
+   longitude of your coop
                         
   -e ELEVATION, --elevation ELEVATION
                         
-                        elevation of your coop
+   elevation of your coop
                         
   -o OPENPIN, --openpin OPENPIN
                         
-                        gpio pin for open
+   gpio pin for open
                         
   -c CLOSEPIN, --closepin CLOSEPIN
                         
-                        gpio pin for close
+   gpio pin for close
                         
   -t RUNTIME, --runtime RUNTIME
                         
-                        runtime for actuator
+   runtime for actuator
                         
-  -d, --debug           enable debugging logging
+  -d, --debug           
+  
+   enable debugging logging
 
 
 # Caveats/Considerations:
 - I use mine on a door that swings on normal hinges, but there isn't any reason you couldn't use this for a door that moves in a single plane.  There are a lot of door designs online like this where it goes up/down vs. swinging on hinges.
-- It is key to have limit switches on the ends of travel for your motor/actuator mechanism.  This program uses a fairly simple approach of just leaving the relays open longer than it takes to open or close the door.  You could do something more elaborate like reading a switch to shut it off if you want to get more fancy.
+- It is key to have limit switches on the ends of travel for your motor/actuator mechanism.  This program uses a fairly simple approach of just leaving the relays energized longer than it takes to open or close the door.  You could do something more elaborate like reading a switch to shut it off if you want to get more fancy.
 - Good idea to mount your Pi and relay modules in a dust proof enclosure in your coop.  I epoxied some mounting plates for the Pi and relay module inside of mine and got some cable glands to keep the entry points for cables sealed up. 
