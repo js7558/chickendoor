@@ -14,6 +14,7 @@ I have a 12" linear actuator controlling a small swinging door on my chicken coo
 2) Figure out the latitude, longitude, and elevation and elevation (meters) of your chicken coop.  Mine in Seattle are something like
       47.6062, -122.3321, and 34.0 respectively.
 3) Schedule chicken.py to run in cron on a reasonable interval. I run mine every 5 minutes:
+    
     0,5,10,15,20,25,30,35,40,45,50,55 * * * * /home/pi/chicken/chicken.py -d -g -122.3321 -l 47.6062 -e 34.0 -o 24 -c 23
 4) Watch the log file in /var/log/chicken.log for a while to make sure it is doing what you want. Once you're happy you can remove -d from           above to turn off debug logging.
 
