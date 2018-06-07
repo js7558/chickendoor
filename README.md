@@ -25,19 +25,27 @@ usage: chicken.py [-h] [-l LATITUDE] [-g LONGITUDE] [-e ELEVATION]
 Automated chicken door controller
 
 optional arguments:
+
   -h, --help            show this help message and exit
+  
   -l LATITUDE, --latitude LATITUDE
                         latitude of your coop
+                        
   -g LONGITUDE, --longitude LONGITUDE
                         longitude of your coop
+                        
   -e ELEVATION, --elevation ELEVATION
                         elevation of your coop
+                        
   -o OPENPIN, --openpin OPENPIN
                         gpio pin for open
+                        
   -c CLOSEPIN, --closepin CLOSEPIN
                         gpio pin for close
+                        
   -t RUNTIME, --runtime RUNTIME
                         runtime for actuator
+                        
   -d, --debug           enable debugging logging
 
 # Caveats/Considerations:
