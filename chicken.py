@@ -26,6 +26,10 @@
 # SOFTWARE.
 # 
 ##################################################################################
+#
+#
+# Updated 9/4 with an offset to allow --offset number of minutes after sunset for
+# closing the door at night.
 
 import ephem
 import datetime
@@ -59,12 +63,13 @@ def getTimes(sun):
 	s1 = home.previous_setting(sun)
 	s2 = home.next_setting(sun)
 
-
 	pSunrise = ephem.Date(ephem.localtime(r1))
 	nSunrise = ephem.Date(ephem.localtime(r2))
 	pSunset = ephem.Date(ephem.localtime(s1))
 	nSunset = ephem.Date(ephem.localtime(s2))
 	tNow = ephem.Date(ephem.localtime(home.date))
+	# added 9/4 - this adds an offset after sunset in case the chickens are slow coming in
+	pSunsetAdj = ephem.Date(ephem.localtime(ephem.Date(s2+ offset * ephem.minute)))
 
 	# debug
 	logger.debug("pSunrise  %s", pSunrise)
@@ -72,8 +77,9 @@ def getTimes(sun):
 	logger.debug("nSunrise  %s", nSunrise)
 	logger.debug("nSunset  %s", nSunset)
 	logger.debug("tNow  %s", tNow)
+	logger.debug("pSunsetAdj  %s", pSunsetAdj)
 
-	return tNow, pSunrise, pSunset, nSunrise, nSunset
+	return tNow, pSunrise, pSunset, nSunrise, nSunset, pSunsetAdj
 
 def getAction(verb):
 # figure out whether we should do anything or if it has already been done
@@ -160,6 +166,7 @@ parser.add_argument('-o','--openpin', type=int, help='gpio pin for open')
 parser.add_argument('-c','--closepin', type=int, help='gpio pin for close')
 parser.add_argument('-t','--runtime', type=int, help='runtime for actuator')
 parser.add_argument('-d','--debug', action='store_true', help='enable debugging logging')
+parser.add_argument('-f','--offset', type=int, default=0, help='sunset offset - minutes after sunset to run') # added 9/4/18
 args = parser.parse_args()
 
 # prime logging
@@ -194,10 +201,12 @@ if (args.openpin):
 if (args.runtime): 
 	runtime = args.runtime
 
+offset = args.offset
+
 sun = ephem.Sun()
 
 # get times for now, next/prev sunrise, and next/prev sunset 
-(tNow, pSunrise, pSunset, nSunrise, nSunset) = getTimes(sun)
+(tNow, pSunrise, pSunset, nSunrise, nSunset, pSunsetAdj) = getTimes(sun)
 
 if ((tNow >= pSunrise and tNow < nSunset) and (pSunrise.tuple()[2] == nSunset.tuple()[2])):
 	# It is between sunrise and sunset AND pSunrise and nSunset are in the same day, the door should be open.
@@ -208,9 +217,10 @@ if ((tNow >= pSunrise and tNow < nSunset) and (pSunrise.tuple()[2] == nSunset.tu
 		logger.debug("Opening door..")	
  		setPins("open", runtime)
 		
-elif (tNow >= pSunset and tNow < nSunrise):
+elif (tNow >= pSunsetAdj and tNow < nSunrise):
+	# js7558 (9/4/18): changed this to pSunsetAdj from pSunset to allow extra min after sunset
 	# it is the middle of the night, the door should be closed
-	logger.debug("tNow > pSunset and tNow < nSunrise, door should be closed")
+	logger.debug("tNow > pSunsetAdj and tNow < nSunrise, door should be closed")
 	if(getAction("close")):
 		logger.debug("Closing Door...")	
 		setPins("close", runtime)
