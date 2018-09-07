@@ -28,8 +28,10 @@
 ##################################################################################
 #
 #
-# Updated 9/4 with an offset to allow --offset number of minutes after sunset for
-# closing the door at night.
+# Updated 9/7/18
+#	- Added offsets to allow open/close triggering to be adjusted by X minutes
+#	see the -O and -C options
+#	- Fixed bug with serviceDay calculation
 
 import ephem
 import datetime
@@ -63,28 +65,35 @@ def getTimes(sun):
 	s1 = home.previous_setting(sun)
 	s2 = home.next_setting(sun)
 
-	pSunrise = ephem.Date(ephem.localtime(r1))
-	nSunrise = ephem.Date(ephem.localtime(r2))
-	pSunset = ephem.Date(ephem.localtime(s1))
-	nSunset = ephem.Date(ephem.localtime(s2))
+	pSunrise_base = ephem.Date(ephem.localtime(r1))
+	nSunrise_base = ephem.Date(ephem.localtime(r2))
+	pSunset_base = ephem.Date(ephem.localtime(s1))
+	nSunset_base = ephem.Date(ephem.localtime(s2))
+	# 9/7 - updated dates to include offset
+	pSunrise = ephem.Date(ephem.localtime(ephem.Date(r1 - o_offset * ephem.minute)))
+	nSunrise = ephem.Date(ephem.localtime(ephem.Date(r2 - o_offset * ephem.minute)))
+	pSunset = ephem.Date(ephem.localtime(ephem.Date(s1 + c_offset * ephem.minute)))
+	nSunset = ephem.Date(ephem.localtime(ephem.Date(s2 + c_offset * ephem.minute)))
 	tNow = ephem.Date(ephem.localtime(home.date))
-	# added 9/4 - this adds an offset after sunset in case the chickens are slow coming in
-	pSunsetAdj = ephem.Date(ephem.localtime(ephem.Date(s2+ offset * ephem.minute)))
 
 	# debug
+	logger.debug("pSunrise_base  %s", pSunrise_base)
+	logger.debug("pSunset_base  %s", pSunset_base)
+	logger.debug("nSunrise_base  %s", nSunrise_base)
+	logger.debug("nSunset_base  %s", nSunset_base)
 	logger.debug("pSunrise  %s", pSunrise)
 	logger.debug("pSunset  %s", pSunset)
 	logger.debug("nSunrise  %s", nSunrise)
 	logger.debug("nSunset  %s", nSunset)
 	logger.debug("tNow  %s", tNow)
-	logger.debug("pSunsetAdj  %s", pSunsetAdj)
 
-	return tNow, pSunrise, pSunset, nSunrise, nSunset, pSunsetAdj
+	return tNow, pSunrise, pSunset, nSunrise, nSunset
 
 def getAction(verb):
 # figure out whether we should do anything or if it has already been done
 	# marker for state files, valid from sunrise to sunrise
-	serviceDay = str(pSunrise.tuple()[3]) + "-" + str(pSunrise.tuple()[2])
+	#serviceDay = str(pSunrise.tuple()[3]) + "-" + str(pSunrise.tuple()[2])
+	serviceDay = str(pSunrise.tuple()[1]) + "-" + str(pSunrise.tuple()[2])
 	logger.debug("serviceDay is %s",serviceDay)
 
 	# state files we store the MM-DD we last did action so we
@@ -166,7 +175,8 @@ parser.add_argument('-o','--openpin', type=int, help='gpio pin for open')
 parser.add_argument('-c','--closepin', type=int, help='gpio pin for close')
 parser.add_argument('-t','--runtime', type=int, help='runtime for actuator')
 parser.add_argument('-d','--debug', action='store_true', help='enable debugging logging')
-parser.add_argument('-f','--offset', type=int, default=0, help='sunset offset - minutes after sunset to run') # added 9/4/18
+parser.add_argument('-C','--c_offset', type=int, default=0, help='sunset offset - minutes after sunset to run') # added 9/4/18
+parser.add_argument('-O','--o_offset', type=int, default=0, help='sunrise offset - minutes before sunrise to run') # added 9/y/18
 args = parser.parse_args()
 
 # prime logging
@@ -201,15 +211,16 @@ if (args.openpin):
 if (args.runtime): 
 	runtime = args.runtime
 
-offset = args.offset
+c_offset = args.c_offset
+o_offset = args.o_offset
 
 sun = ephem.Sun()
 
 # get times for now, next/prev sunrise, and next/prev sunset 
-(tNow, pSunrise, pSunset, nSunrise, nSunset, pSunsetAdj) = getTimes(sun)
+(tNow, pSunrise, pSunset, nSunrise, nSunset) = getTimes(sun)
 
 if ((tNow >= pSunrise and tNow < nSunset) and (pSunrise.tuple()[2] == nSunset.tuple()[2])):
-	# It is between sunrise and sunset AND pSunrise and nSunset are in the same day, the door should be open.
+	# It is between sunrise (minus offset) and sunset AND pSunrise and nSunset are in the same day, the door should be open.
 	# The day compare (tuple()[2]) is required since nSunset turns into tomorrow right at sunset, so this always
 	# evaluated true otherwise. Ugly, maybe find a better way to do this later.
 	logger.debug("tNow > pSunrise and tNow < nSunset, door should be open")
@@ -217,10 +228,10 @@ if ((tNow >= pSunrise and tNow < nSunset) and (pSunrise.tuple()[2] == nSunset.tu
 		logger.debug("Opening door..")	
  		setPins("open", runtime)
 		
-elif (tNow >= pSunsetAdj and tNow < nSunrise):
-	# js7558 (9/4/18): changed this to pSunsetAdj from pSunset to allow extra min after sunset
+elif (tNow >= pSunset and tNow < nSunrise):
+	# js7558 (9/4/18): changed this to pSunset from pSunset to allow extra min after sunset
 	# it is the middle of the night, the door should be closed
-	logger.debug("tNow > pSunsetAdj and tNow < nSunrise, door should be closed")
+	logger.debug("tNow > pSunset and tNow < nSunrise, door should be closed")
 	if(getAction("close")):
 		logger.debug("Closing Door...")	
 		setPins("close", runtime)
