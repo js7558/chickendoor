@@ -33,6 +33,7 @@
 #	see the -O and -C options
 #	- Fixed bug with serviceDay calculation
 
+
 import ephem
 import datetime
 import time
@@ -65,35 +66,59 @@ def getTimes(sun):
 	s1 = home.previous_setting(sun)
 	s2 = home.next_setting(sun)
 
-	pSunrise_base = ephem.Date(ephem.localtime(r1))
-	nSunrise_base = ephem.Date(ephem.localtime(r2))
-	pSunset_base = ephem.Date(ephem.localtime(s1))
-	nSunset_base = ephem.Date(ephem.localtime(s2))
-	# 9/7 - updated dates to include offset
-	pSunrise = ephem.Date(ephem.localtime(ephem.Date(r1 - o_offset * ephem.minute)))
-	nSunrise = ephem.Date(ephem.localtime(ephem.Date(r2 - o_offset * ephem.minute)))
-	pSunset = ephem.Date(ephem.localtime(ephem.Date(s1 + c_offset * ephem.minute)))
-	nSunset = ephem.Date(ephem.localtime(ephem.Date(s2 + c_offset * ephem.minute)))
+	# calculate prev/next sunrise/sunset and tNow
+	pSunrise = ephem.Date(ephem.localtime(r1))
+	nSunrise = ephem.Date(ephem.localtime(r2))
+	pSunset = ephem.Date(ephem.localtime(s1))
+	nSunset = ephem.Date(ephem.localtime(s2))
 	tNow = ephem.Date(ephem.localtime(home.date))
 
+	# calculate tOpen and tClose based on which side of midnight we are on and any offsets
+	if (tNow > pSunset and tNow.tuple()[2] == pSunset.tuple()[2]):
+		logger.debug("in branch tNow > pSunset and tNow.tuple()[2] == pSunset.tuple()[2], AE")
+		# tNow and pSunset are on the same day, so we're after sunset before midnight
+		# this is either scenario A or E
+		tOpen = ephem.Date(ephem.localtime(ephem.Date(r1 - c_offset * ephem.minute)))
+		tClose = ephem.Date(ephem.localtime(ephem.Date(s1 + c_offset * ephem.minute)))
+	elif (tNow <= nSunset and tNow.tuple()[2] == nSunset.tuple()[2]):
+		# tNow and nSunset are on the same day 
+		# this is either scenario B, C, or D
+		logger.debug("tNow <= nSunset and tNow.tuple()[2] == nSunset.tuple()[2], BCD")
+
+		# tClose is always based on nSunset
+		tClose = ephem.Date(ephem.localtime(ephem.Date(s2 + c_offset * ephem.minute)))
+
+		# tOpen calculates with nSunrise until nSunrise passes, then calculate with pSunrise
+		# the scenario C vs D math gets sorted out at the main program by comparing tNow with tOpen and tClose
+		if (tNow < nSunrise and tNow.tuple()[2] == nSunrise.tuple()[2]):
+			logger.debug("tNow < nSunrise and tNow.tuple()[2] == nSunrise.tuple()[2], scenario B or C")
+			tOpen = ephem.Date(ephem.localtime(ephem.Date(r2 - c_offset * ephem.minute)))
+		else:
+			logger.debug("tNow not less than nSunrise and not on same day as nSunrise, scenario C or D")
+			tOpen = ephem.Date(ephem.localtime(ephem.Date(r1 - c_offset * ephem.minute)))
+		
+	else:
+		# something bad happened, so set nonsense values that make the door shut
+		logger.debug("something wacky is happening, check 'er out")
+		tClose = pSunrise
+		tOpen = nSunset
+
+
 	# debug
-	logger.debug("pSunrise_base  %s", pSunrise_base)
-	logger.debug("pSunset_base  %s", pSunset_base)
-	logger.debug("nSunrise_base  %s", nSunrise_base)
-	logger.debug("nSunset_base  %s", nSunset_base)
 	logger.debug("pSunrise  %s", pSunrise)
 	logger.debug("pSunset  %s", pSunset)
 	logger.debug("nSunrise  %s", nSunrise)
 	logger.debug("nSunset  %s", nSunset)
+	logger.debug("tOpen  %s", tOpen)
+	logger.debug("tClose  %s", tClose)
 	logger.debug("tNow  %s", tNow)
 
-	return tNow, pSunrise, pSunset, nSunrise, nSunset
+	return tNow, tOpen, tClose
 
 def getAction(verb):
 # figure out whether we should do anything or if it has already been done
-	# marker for state files, valid from sunrise to sunrise
-	#serviceDay = str(pSunrise.tuple()[3]) + "-" + str(pSunrise.tuple()[2])
-	serviceDay = str(pSunrise.tuple()[1]) + "-" + str(pSunrise.tuple()[2])
+	# marker for state files, valid from tOpen to tClose
+	serviceDay = str(tOpen.tuple()[1]) + "-" + str(tOpen.tuple()[2])
 	logger.debug("serviceDay is %s",serviceDay)
 
 	# state files we store the MM-DD we last did action so we
@@ -117,7 +142,13 @@ def getAction(verb):
 				return 0
 			else:
 				# the file has an old date in it so we do the action just in case the program
-				# bailed earlier
+				# bailed earlier OR if something wacky happened and prevRun > serviceDay
+				#
+				# js7558, 9-21: There is a slight bug here where it tries to close
+				# the door again at the first run past midnight since tOpen has changed 
+				# from yesterday to today.  This causes the relay to be energized
+				# but may not be problematic since the limit switch will keep the motor
+				# from running.  Not ideal but not catastrophic.
 				logger.info("ACTION: prevRun %s != serviceDay %s, %s door", prevRun, serviceDay, verb)
 				f = open(p1,"w")
 				f.write(serviceDay)
@@ -175,8 +206,8 @@ parser.add_argument('-o','--openpin', type=int, help='gpio pin for open')
 parser.add_argument('-c','--closepin', type=int, help='gpio pin for close')
 parser.add_argument('-t','--runtime', type=int, help='runtime for actuator')
 parser.add_argument('-d','--debug', action='store_true', help='enable debugging logging')
-parser.add_argument('-C','--c_offset', type=int, default=0, help='sunset offset - minutes after sunset to run') # added 9/4/18
-parser.add_argument('-O','--o_offset', type=int, default=0, help='sunrise offset - minutes before sunrise to run') # added 9/y/18
+parser.add_argument('-C','--c_offset', type=int, default=0, choices=xrange(0,90), help='sunset offset - minutes after sunset to run') # added 9/4/18, allow 0-90 as valid values
+parser.add_argument('-O','--o_offset', type=int, default=0, choices=xrange(0,90), help='sunrise offset - minutes before sunrise to run') # added 9/4/18, allow 0-90 as valid values
 args = parser.parse_args()
 
 # prime logging
@@ -216,23 +247,26 @@ o_offset = args.o_offset
 
 sun = ephem.Sun()
 
-# get times for now, next/prev sunrise, and next/prev sunset 
-(tNow, pSunrise, pSunset, nSunrise, nSunset) = getTimes(sun)
+# get times for now, today's open, and today's close
+(tNow, tOpen, tClose) = getTimes(sun)
 
-if ((tNow >= pSunrise and tNow < nSunset) and (pSunrise.tuple()[2] == nSunset.tuple()[2])):
-	# It is between sunrise (minus offset) and sunset AND pSunrise and nSunset are in the same day, the door should be open.
-	# The day compare (tuple()[2]) is required since nSunset turns into tomorrow right at sunset, so this always
-	# evaluated true otherwise. Ugly, maybe find a better way to do this later.
-	logger.debug("tNow > pSunrise and tNow < nSunset, door should be open")
+logger.debug("tOpen.tuple()[2]  %s", tOpen.tuple()[2])
+logger.debug("tClose.tuple()[2]  %s", tClose.tuple()[2])
+logger.debug("tNow.tuple()[2]  %s", tNow.tuple()[2])
+logger.debug("evaluating tnow >= tOpen  %s", tNow >= tOpen)
+logger.debug("evaluating tnow < tClose  %s", tNow < tClose)
+
+if (tNow >= tOpen and tNow < tClose):
+	logger.debug("tNow > tOpen and tNow < tClose, door should be open")
 	if(getAction("open")):
 		logger.debug("Opening door..")	
  		setPins("open", runtime)
 		
-elif (tNow >= pSunset and tNow < nSunrise):
-	# js7558 (9/4/18): changed this to pSunset from pSunset to allow extra min after sunset
-	# it is the middle of the night, the door should be closed
-	logger.debug("tNow > pSunset and tNow < nSunrise, door should be closed")
+else: 
+	# the door should be closed
+	logger.debug("tNow =< tOpen or tNow > tClose, door should be closed")
 	if(getAction("close")):
 		logger.debug("Closing Door...")	
 		setPins("close", runtime)
 
+logger.debug("\n")
